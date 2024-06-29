@@ -6,6 +6,10 @@ enable-colors = 'auto'
 # history file
 max-history-size = 1000
 
+#Locale, used to format the result
+#See available values in CLDR repository - https://en.wikipedia.org/wiki/Common_Locale_Data_Repository
+locale = 'en'
+
 # The characters that are shown as the prompt when
 # using fend interactively
 prompt = '> '

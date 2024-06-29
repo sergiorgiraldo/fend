@@ -3,8 +3,10 @@
 #![deny(clippy::pedantic)]
 #![deny(elided_lifetimes_in_paths)]
 
+use core::str;
 use std::fmt::Write;
 use std::{error, io, process};
+use num_format::{Locale, ToFormattedString};
 
 mod args;
 mod color;
@@ -33,7 +35,24 @@ fn print_spans(spans: Vec<fend_core::SpanRef<'_>>, config: &config::Config) -> S
 	let mut result = String::new();
 	for span in spans {
 		let style = config.colors.get_color(span.kind());
-		write!(result, "{style}{}\x1b[0m", span.string()).unwrap();
+
+        let mut span_representation = span.string().to_string(); 
+
+        if span.kind() == fend_core::SpanKind::Number {
+            eprintln!("##SPAN NUMBER## {} ", span.string());
+            let result = span.string().parse::<f64>();
+
+            if result.is_ok() {
+                eprintln!("##FORMATTING##");
+                let span_as_number = result.unwrap();
+                span_representation = span_as_number.to_formatted_string(&Locale::from_name(&config.locale).unwrap());
+            }
+        }
+        else{
+            eprintln!("##SPAN NOT NUMBER## {} ", span.string());
+        }
+
+		write!(result, "{style}{}\x1b[0m", span_representation).unwrap();
 	}
 	result
 }
@@ -57,7 +76,10 @@ fn eval_and_print_res(
 				} else {
 					res.get_main_result().to_string()
 				};
-				if res.has_trailing_newline() {
+
+                // let foo = 1000000.to_formatted_string(&Locale::from_name(&config.locale).unwrap());
+				
+                if res.has_trailing_newline() {
 					println!("{string_result}");
 				} else {
 					print!("{string_result}");

@@ -1,5 +1,6 @@
 use crate::{color, custom_units::CustomUnitDefinition};
 use std::{env, fmt, fs, io};
+use num_format::Locale;
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Config {
@@ -11,6 +12,7 @@ pub struct Config {
 	pub enable_internet_access: bool,
 	pub exchange_rate_source: ExchangeRateSource,
 	pub custom_units: Vec<CustomUnitDefinition>,
+    pub locale: String,
 	unknown_settings: UnknownSettings,
 	unknown_keys: Vec<String>,
 }
@@ -77,6 +79,7 @@ impl<'de> serde::de::Visitor<'de> for ConfigVisitor {
 		let mut seen_enable_internet_access = false;
 		let mut seen_exchange_rate_source = false;
 		let mut seen_custom_units = false;
+		let mut seen_locale = false;
 		while let Some(key) = map.next_key::<String>()? {
 			match key.as_str() {
 				"prompt" => {
@@ -157,6 +160,21 @@ impl<'de> serde::de::Visitor<'de> for ConfigVisitor {
 					result.custom_units = map.next_value()?;
 					seen_custom_units = true;
 				}
+				"locale" => {
+					if seen_locale {
+						return Err(serde::de::Error::duplicate_field("locale"));
+					}
+					let locale:String = map.next_value()?;
+
+                    if is_valid_locale(&locale) {
+                        result.locale = locale;
+					} else {
+						eprintln!("Error: unknown config setting for locale");
+                        // https://docs.rs/num-format/0.4.4/src/num_format/locale.rs.html#1139-1141
+                        // https://en.wikipedia.org/wiki/Common_Locale_Data_Repository
+					}
+					seen_locale = true;
+				}
 				unknown_key => {
 					// this may occur if the user has multiple fend versions installed
 					map.next_value::<toml::Value>()?;
@@ -196,6 +214,7 @@ impl Default for Config {
 			exchange_rate_source: ExchangeRateSource::UnitedNations,
 			custom_units: vec![],
 			unknown_keys: vec![],
+            locale: "en".to_string(),
 		}
 	}
 }
@@ -267,6 +286,20 @@ fn use_colors_if_auto() -> bool {
 	false
 }
 
+fn is_valid_locale(locale_cfg: &str) -> bool {
+    if locale_cfg.is_empty() {
+        return false;
+    }
+
+    let result = &Locale::from_name(locale_cfg);
+
+    if result.is_err(){
+        return false;
+    }
+
+    true
+}
+
 pub fn read() -> Config {
 	read_config_file()
 }
@@ -279,5 +312,13 @@ mod tests {
 	fn test_default_config_file() {
 		let deserialized: Config = toml::from_str(DEFAULT_CONFIG_FILE).unwrap();
 		assert_eq!(deserialized, Config::default());
+	}
+
+	#[test]
+	fn test_locales() {
+		assert_eq!(true, is_valid_locale("en"));
+		assert_eq!(true, is_valid_locale("en-NL"));
+		assert_eq!(false, is_valid_locale("XX-XX"));
+        assert_eq!(false, is_valid_locale(""));
 	}
 }
